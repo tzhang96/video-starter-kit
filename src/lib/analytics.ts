@@ -128,13 +128,13 @@ export function getModelName(modelId: string): string {
 
 export async function analyzePrompts(
   mediaItems: MediaItem[],
+  customSystemPrompt?: string,
 ): Promise<PromptAnalysis[]> {
   // Group by model
   const byModel = new Map<string, MediaItem[]>();
 
   for (const item of mediaItems) {
-    if (item.kind !== "generated" || !item.input?.prompt || !item.rating)
-      continue;
+    if (item.kind !== "generated" || !item.input?.prompt || !item.rating) continue;
     const modelId = item.endpointId;
     if (!byModel.has(modelId)) {
       byModel.set(modelId, []);
@@ -162,6 +162,7 @@ export async function analyzePrompts(
         positivePrompts,
         negativePrompts,
         modelId,
+        customSystemPrompt,
       );
 
       return {
@@ -180,6 +181,7 @@ async function analyzeWithGemini(
   positivePrompts: string[],
   negativePrompts: string[],
   modelId: string,
+  customSystemPrompt?: string,
 ): Promise<{
   positivePatterns: string[];
   negativePatterns: string[];
@@ -212,8 +214,7 @@ Example format:
   try {
     const { data } = await fal.subscribe("fal-ai/any-llm", {
       input: {
-        system_prompt:
-          "You are an AI prompt analysis assistant. Analyze patterns in successful and unsuccessful prompts to provide actionable insights. Always respond in valid JSON format.",
+        system_prompt: customSystemPrompt || "You are an AI prompt analysis assistant. Analyze patterns in successful and unsuccessful prompts to provide actionable insights. Always respond in valid JSON format.",
         prompt,
         model: "meta-llama/llama-3.2-1b-instruct",
       },
@@ -225,9 +226,7 @@ Example format:
       console.error("Failed to parse LLM response as JSON:", error);
       return {
         positivePatterns: ["Could not analyze patterns in successful prompts"],
-        negativePatterns: [
-          "Could not analyze patterns in unsuccessful prompts",
-        ],
+        negativePatterns: ["Could not analyze patterns in unsuccessful prompts"],
         recommendations: ["Try rating more prompts to get better analysis"],
       };
     }

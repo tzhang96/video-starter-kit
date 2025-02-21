@@ -14,6 +14,7 @@ import { PromptAnalysis } from "./prompt-analysis";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCallback } from "react";
 import type { MediaItem } from "@/data/schema";
+import type { MediaType } from "@/data/store";
 import type { PromptAnalysis as PromptAnalysisType } from "@/lib/analytics";
 
 interface AnalyticsDialogProps {
@@ -82,6 +83,30 @@ export function AnalyticsDialog({ onOpenChange }: AnalyticsDialogProps) {
     [mediaItems],
   );
 
+  const handleAnalyzeCategory = useCallback(
+    async (category: MediaType, modelIds: string[]): Promise<PromptAnalysisType> => {
+      // Get all rated prompts for the selected models
+      const modelItems = mediaItems.filter(
+        (item) =>
+          item.kind === "generated" &&
+          modelIds.includes(item.endpointId) &&
+          item.input?.prompt &&
+          item.rating
+      );
+
+      // Create a special system prompt for category analysis
+      const systemPrompt = `You are an AI prompt analysis assistant specializing in ${category} generation. 
+Analyze patterns across multiple models to identify what works best for ${category} generation.
+Compare and contrast different approaches, and provide strategic recommendations for using these models effectively.
+Always respond in valid JSON format.`;
+
+      // Call analyzePrompts with the category-specific system prompt
+      const [analysis] = await analyzePrompts(modelItems, systemPrompt);
+      return analysis;
+    },
+    [mediaItems],
+  );
+
   const handleOnOpenChange = (isOpen: boolean) => {
     onOpenChange?.(isOpen);
     setAnalyticsDialogOpen(isOpen);
@@ -125,6 +150,7 @@ export function AnalyticsDialog({ onOpenChange }: AnalyticsDialogProps) {
             <PromptAnalysis
               data={promptData}
               onAnalyze={handleAnalyzePrompts}
+              onAnalyzeCategory={handleAnalyzeCategory}
             />
           </TabsContent>
         </Tabs>
