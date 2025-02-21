@@ -22,13 +22,50 @@ interface ModelPrompts {
 interface PromptAnalysisProps {
   data: ModelPrompts[];
   onAnalyze: (modelId: string) => Promise<PromptAnalysisType>;
+<<<<<<< Updated upstream
 }
 
 export function PromptAnalysis({ data, onAnalyze }: PromptAnalysisProps) {
+=======
+  onAnalyzeCategory?: (
+    category: MediaType,
+    modelIds: string[],
+  ) => Promise<PromptAnalysisType>;
+}
+
+type FilterType = MediaType | "all";
+
+function getModelType(modelId: string): MediaType | null {
+  // First try exact match
+  const endpoint = AVAILABLE_ENDPOINTS.find((e) => e.endpointId === modelId);
+  if (endpoint) return endpoint.category;
+
+  // Try matching base model ID (for variants like image-to-video)
+  const baseModelId = modelId.split("/").slice(0, -1).join("/");
+  const baseEndpoint = AVAILABLE_ENDPOINTS.find(
+    (e) => e.endpointId === baseModelId,
+  );
+  return baseEndpoint?.category || null;
+}
+
+export function PromptAnalysis({
+  data,
+  onAnalyze,
+  onAnalyzeCategory,
+}: PromptAnalysisProps) {
+  const [selectedType, setSelectedType] = useState<FilterType>("video");
+>>>>>>> Stashed changes
   const [analysisResults, setAnalysisResults] = useState<
     Record<string, PromptAnalysisType>
   >({});
   const [analyzing, setAnalyzing] = useState<Record<string, boolean>>({});
+<<<<<<< Updated upstream
+=======
+  const [categoryAnalysis, setCategoryAnalysis] = useState<
+    Record<string, PromptAnalysisType>
+  >({});
+  const [analyzingCategory, setAnalyzingCategory] = useState(false);
+>>>>>>> Stashed changes
 
   if (data.length === 0) {
     return (
@@ -49,9 +86,145 @@ export function PromptAnalysis({ data, onAnalyze }: PromptAnalysisProps) {
     }
   };
 
+<<<<<<< Updated upstream
   return (
     <div className="space-y-6">
       {data.map((model) => (
+=======
+  const handleAnalyzeCategory = async () => {
+    if (!onAnalyzeCategory || analyzingCategory) return;
+
+    setAnalyzingCategory(true);
+    try {
+      const category = selectedType as MediaType;
+      const modelIds = data
+        .filter(
+          (model) =>
+            selectedType === "all" ||
+            getModelType(model.modelId) === selectedType,
+        )
+        .map((model) => model.modelId);
+
+      if (modelIds.length === 0) return;
+
+      const result = await onAnalyzeCategory(category, modelIds);
+      setCategoryAnalysis((prev) => ({ ...prev, [selectedType]: result }));
+    } finally {
+      setAnalyzingCategory(false);
+    }
+  };
+
+  const filteredData = data.filter(
+    (model) =>
+      selectedType === "all" || getModelType(model.modelId) === selectedType,
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4">
+        <ToggleGroup
+          type="single"
+          value={selectedType}
+          onValueChange={handleFilterChange}
+          className="justify-start"
+        >
+          <ToggleGroupItem value="video" aria-label="Video models">
+            <FilmIcon className="w-4 h-4 mr-2" />
+            Video
+          </ToggleGroupItem>
+          <ToggleGroupItem value="image" aria-label="Image models">
+            <ImageIcon className="w-4 h-4 mr-2" />
+            Image
+          </ToggleGroupItem>
+          <ToggleGroupItem value="music" aria-label="Music models">
+            <MusicIcon className="w-4 h-4 mr-2" />
+            Music
+          </ToggleGroupItem>
+          <ToggleGroupItem value="voiceover" aria-label="Voiceover models">
+            <MicIcon className="w-4 h-4 mr-2" />
+            Voice
+          </ToggleGroupItem>
+          <ToggleGroupItem value="all" aria-label="All models">
+            <LayersIcon className="w-4 h-4 mr-2" />
+            All
+          </ToggleGroupItem>
+        </ToggleGroup>
+
+        {onAnalyzeCategory && filteredData.length > 0 && (
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              onClick={handleAnalyzeCategory}
+              disabled={analyzingCategory}
+            >
+              <TrendingUpIcon className="w-4 h-4 mr-2" />
+              {analyzingCategory
+                ? `Analyzing ${selectedType === "all" ? "All Models" : selectedType} Usage...`
+                : `Compare ${selectedType === "all" ? "All Models" : selectedType} Usage`}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Category Analysis Results */}
+      {categoryAnalysis[selectedType] && (
+        <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 space-y-4">
+          <h3 className="text-xl font-semibold leading-none tracking-tight flex items-center gap-2">
+            <TrendingUpIcon className="w-5 h-5" />
+            {selectedType === "all"
+              ? "Cross-Model Analysis"
+              : `${selectedType} Models Analysis`}
+          </h3>
+
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-sm font-medium text-green-600 dark:text-green-500 mb-2 flex items-center gap-1">
+                <CheckCircleIcon className="w-4 h-4" />
+                Key Success Patterns
+              </h4>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                {categoryAnalysis[selectedType].analysis.positivePatterns.map(
+                  (pattern, i) => (
+                    <li key={i}>{pattern}</li>
+                  ),
+                )}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium text-red-600 dark:text-red-500 mb-2 flex items-center gap-1">
+                <XCircleIcon className="w-4 h-4" />
+                Common Challenges
+              </h4>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                {categoryAnalysis[selectedType].analysis.negativePatterns.map(
+                  (pattern, i) => (
+                    <li key={i}>{pattern}</li>
+                  ),
+                )}
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
+                <LightbulbIcon className="w-4 h-4" />
+                Strategic Recommendations
+              </h4>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                {categoryAnalysis[selectedType].analysis.recommendations.map(
+                  (rec, i) => (
+                    <li key={i}>{rec}</li>
+                  ),
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Individual Model Analysis */}
+      {filteredData.map((model) => (
+>>>>>>> Stashed changes
         <div
           key={model.modelId}
           className="rounded-lg border bg-card text-card-foreground shadow-sm"

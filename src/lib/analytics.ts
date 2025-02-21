@@ -210,17 +210,22 @@ Example format:
 }`;
 
   try {
-    const { data } = await fal.subscribe("fal-ai/any-llm", {
+    const { data } = await fal.subscribe("fal-ai/gemini-2.0-flash", {
       input: {
+<<<<<<< Updated upstream
         system_prompt:
           "You are an AI prompt analysis assistant. Analyze patterns in successful and unsuccessful prompts to provide actionable insights. Always respond in valid JSON format.",
+=======
+>>>>>>> Stashed changes
         prompt,
-        model: "meta-llama/llama-3.2-1b-instruct",
+        system_prompt: customSystemPrompt || "You are an AI prompt analysis assistant. Analyze patterns in successful and unsuccessful prompts to provide actionable insights. Always respond in valid JSON format.",
+        temperature: 0.7,
+        max_tokens: 1000,
       },
     });
 
     try {
-      return extractJson(data.output);
+      return extractJson(data.response);
     } catch (error) {
       console.error("Failed to parse LLM response as JSON:", error);
       return {
