@@ -272,6 +272,8 @@ export function VideoTrackView({
     const startWidth = trackElement.offsetWidth;
     const startLeft = trackElement.offsetLeft;
     const startTimestamp = frame.timestamp;
+    const originalStartTime = frame.startTime || 0;
+    const originalDuration = frame.duration;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       const deltaX = moveEvent.clientX - startX;
@@ -301,6 +303,11 @@ export function VideoTrackView({
         // Update timestamp based on new position
         const newTimestamp = (newLeft / bounds.parentWidth) * 30 * 1000;
         frame.timestamp = Math.max(0, newTimestamp);
+
+        // Calculate how much of the original video we're trimming from the start
+        const trimAmount = startWidth - newWidth;
+        const trimTime = (trimAmount / bounds.parentWidth) * 30 * 1000;
+        frame.startTime = originalStartTime + trimTime;
       }
 
       let newDuration = (newWidth / bounds.parentWidth) * 30 * 1000;
@@ -313,6 +320,11 @@ export function VideoTrackView({
           const endPoint = startLeft + startWidth;
           newLeft = endPoint - newWidth;
           frame.timestamp = (newLeft / bounds.parentWidth) * 30 * 1000;
+          
+          // Recalculate startTime based on how much we trimmed
+          const trimAmount = startWidth - newWidth;
+          const trimTime = (trimAmount / bounds.parentWidth) * 30 * 1000;
+          frame.startTime = originalStartTime + trimTime;
         }
       } else if (newDuration > maxDuration) {
         newDuration = maxDuration;
@@ -321,6 +333,11 @@ export function VideoTrackView({
           const endPoint = startLeft + startWidth;
           newLeft = endPoint - newWidth;
           frame.timestamp = (newLeft / bounds.parentWidth) * 30 * 1000;
+          
+          // Recalculate startTime based on how much we trimmed
+          const trimAmount = startWidth - newWidth;
+          const trimTime = (trimAmount / bounds.parentWidth) * 30 * 1000;
+          frame.startTime = originalStartTime + trimTime;
         }
       }
 
@@ -336,6 +353,7 @@ export function VideoTrackView({
       // Round values to prevent floating point imprecision
       frame.duration = Math.round(frame.duration / 100) * 100;
       frame.timestamp = Math.round(frame.timestamp / 100) * 100;
+      frame.startTime = Math.round(frame.startTime / 100) * 100;
       
       // Update styles with rounded values
       trackElement.style.width = `${((frame.duration / 30) * 100) / 1000}%`;
@@ -343,11 +361,13 @@ export function VideoTrackView({
       
       db.keyFrames.update(frame.id, { 
         duration: frame.duration,
-        timestamp: frame.timestamp 
+        timestamp: frame.timestamp,
+        startTime: frame.startTime
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.projectPreview(projectId),
       });
+      
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
