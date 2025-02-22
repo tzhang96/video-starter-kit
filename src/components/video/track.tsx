@@ -272,7 +272,7 @@ export function VideoTrackView({
     const startWidth = trackElement.offsetWidth;
     const startLeft = trackElement.offsetLeft;
     const startTimestamp = frame.timestamp;
-    const originalStartTime = frame.startTime || 0;
+    const originalStartOffset = frame.startOffset || 0;
     const originalDuration = frame.duration;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
@@ -284,7 +284,6 @@ export function VideoTrackView({
       const maxDuration: number = resolveDuration(media) ?? 5000;
 
       if (direction === "left") {
-        // Calculate new position and width while maintaining the end point
         const endPoint = startLeft + startWidth;
         
         // Calculate new left position in percentage
@@ -307,7 +306,7 @@ export function VideoTrackView({
         // Calculate how much of the original video we're trimming from the start
         const trimAmount = startWidth - newWidth;
         const trimTime = (trimAmount / bounds.parentWidth) * 30 * 1000;
-        frame.startTime = originalStartTime + trimTime;
+        frame.startOffset = originalStartOffset + trimTime;
       }
 
       let newDuration = (newWidth / bounds.parentWidth) * 30 * 1000;
@@ -321,10 +320,10 @@ export function VideoTrackView({
           newLeft = endPoint - newWidth;
           frame.timestamp = (newLeft / bounds.parentWidth) * 30 * 1000;
           
-          // Recalculate startTime based on how much we trimmed
+          // Recalculate startOffset based on how much we trimmed
           const trimAmount = startWidth - newWidth;
           const trimTime = (trimAmount / bounds.parentWidth) * 30 * 1000;
-          frame.startTime = originalStartTime + trimTime;
+          frame.startOffset = originalStartOffset + trimTime;
         }
       } else if (newDuration > maxDuration) {
         newDuration = maxDuration;
@@ -334,10 +333,10 @@ export function VideoTrackView({
           newLeft = endPoint - newWidth;
           frame.timestamp = (newLeft / bounds.parentWidth) * 30 * 1000;
           
-          // Recalculate startTime based on how much we trimmed
+          // Recalculate startOffset based on how much we trimmed
           const trimAmount = startWidth - newWidth;
           const trimTime = (trimAmount / bounds.parentWidth) * 30 * 1000;
-          frame.startTime = originalStartTime + trimTime;
+          frame.startOffset = originalStartOffset + trimTime;
         }
       }
 
@@ -353,7 +352,7 @@ export function VideoTrackView({
       // Round values to prevent floating point imprecision
       frame.duration = Math.round(frame.duration / 100) * 100;
       frame.timestamp = Math.round(frame.timestamp / 100) * 100;
-      frame.startTime = Math.round(frame.startTime / 100) * 100;
+      frame.startOffset = Math.round(frame.startOffset / 100) * 100;
       
       // Update styles with rounded values
       trackElement.style.width = `${((frame.duration / 30) * 100) / 1000}%`;
@@ -362,7 +361,7 @@ export function VideoTrackView({
       db.keyFrames.update(frame.id, { 
         duration: frame.duration,
         timestamp: frame.timestamp,
-        startTime: frame.startTime
+        startOffset: frame.startOffset
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.projectPreview(projectId),
@@ -426,7 +425,7 @@ export function VideoTrackView({
         </div>
         <div
           className={cn(
-            "p-px flex-1 items-center bg-repeat-x h-full max-h-full overflow-hidden relative"
+            "p-px flex-1 items-center bg-repeat-x h-full max-h-full overflow-hidden relative",
           )}
           style={
             imageUrl

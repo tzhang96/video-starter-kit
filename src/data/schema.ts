@@ -42,7 +42,7 @@ export type VideoKeyFrame = {
   id: string;
   timestamp: number;
   duration: number;
-  startTime: number;
+  startOffset: number;
   trackId: string;
   data: KeyFrameData;
 };
@@ -79,6 +79,7 @@ export type MediaItem = {
   input?: Record<string, any>;
   output?: Record<string, any>;
   url?: string;
+  rating?: "positive" | "negative";
   metadata?: Record<string, any>; // TODO: Define the metadata schema
 } & (
   | {
@@ -87,6 +88,7 @@ export type MediaItem = {
       requestId: string;
       input: Record<string, any>;
       output?: Record<string, any>;
+      rating?: "positive" | "negative";
     }
   | {
       kind: "uploaded";
