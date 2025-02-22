@@ -23,12 +23,15 @@ interface AnalyticsDialogProps {
 
 function preparePromptData(mediaItems: MediaItem[]) {
   // Group rated prompts by category
-  const byCategory = new Map<MediaType, Array<{
-    prompt: string;
-    rating: "positive" | "negative";
-    timestamp: number;
-    modelId: string;
-  }>>();
+  const byCategory = new Map<
+    MediaType,
+    Array<{
+      prompt: string;
+      rating: "positive" | "negative";
+      timestamp: number;
+      modelId: string;
+    }>
+  >();
 
   for (const item of mediaItems) {
     if (
@@ -36,7 +39,8 @@ function preparePromptData(mediaItems: MediaItem[]) {
       !item.input?.prompt ||
       !item.rating ||
       !item.endpointId
-    ) continue;
+    )
+      continue;
 
     const category = item.mediaType;
     if (!byCategory.has(category)) {
@@ -51,11 +55,10 @@ function preparePromptData(mediaItems: MediaItem[]) {
   }
 
   // Convert to array format and sort by timestamp
-  return Array.from(byCategory.entries())
-    .map(([category, promptHistory]) => ({
-      category,
-      promptHistory: promptHistory.sort((a, b) => a.timestamp - b.timestamp),
-    }));
+  return Array.from(byCategory.entries()).map(([category, promptHistory]) => ({
+    category,
+    promptHistory: promptHistory.sort((a, b) => a.timestamp - b.timestamp),
+  }));
 }
 
 export function AnalyticsDialog({ onOpenChange }: AnalyticsDialogProps) {

@@ -152,7 +152,8 @@ export async function analyzePrompts(
   const byCategory = new Map<MediaType, MediaItem[]>();
 
   for (const item of mediaItems) {
-    if (item.kind !== "generated" || !item.input?.prompt || !item.rating) continue;
+    if (item.kind !== "generated" || !item.input?.prompt || !item.rating)
+      continue;
     const category = item.mediaType;
     if (!byCategory.has(category)) {
       byCategory.set(category, []);
@@ -168,15 +169,16 @@ export async function analyzePrompts(
 
       // Create prompt history
       const promptHistory = sortedItems
-        .filter((item): item is MediaItem & { endpointId: string } => 
-          item.kind === "generated" && typeof item.endpointId === "string"
+        .filter(
+          (item): item is MediaItem & { endpointId: string } =>
+            item.kind === "generated" && typeof item.endpointId === "string",
         )
-        .map(item => ({
+        .map((item) => ({
           prompt: item.input?.prompt as string,
           rating: item.rating as "positive" | "negative",
           timestamp: item.createdAt,
           modelId: item.endpointId,
-          imageUrl: item.input?.image_url as string | undefined
+          imageUrl: item.input?.image_url as string | undefined,
         }));
 
       // Skip if no rated prompts
@@ -207,13 +209,13 @@ async function analyzeWithGemini(
   customSystemPrompt?: string,
 ): Promise<PromptAnalysis["analysis"]> {
   const isVideo = category === "video";
-  
+
   const defaultSystemPrompt = `You are an AI prompt analysis assistant specializing in ${category} generation.
 Your task is to analyze the evolution of prompts over time and identify what changes led to successful outcomes. 
-${isVideo ? 
-  `For video content, you will analyze related attempts at generating the same scene, primarily identified by shared image URLs. Pay special attention to how different prompt variations affect the same base image and identify which changes led to better results.` 
-  : 
-  `For ${category} content, you will analyze groups of prompts that share similar goals or techniques. Examine prompt length, structure, focus, etc. The most successful prompts are the ones that generate a positively-rated output in one attempt. Focus on understanding which variations in approach were most effective and what patterns emerge across successful attempts.`
+${
+  isVideo
+    ? `For video content, you will analyze related attempts at generating the same scene, primarily identified by shared image URLs. Pay special attention to how different prompt variations affect the same base image and identify which changes led to better results.`
+    : `For ${category} content, you will analyze groups of prompts that share similar goals or techniques. Examine prompt length, structure, focus, etc. The most successful prompts are the ones that generate a positively-rated output in one attempt. Focus on understanding which variations in approach were most effective and what patterns emerge across successful attempts.`
 }
 
 Examine prompt length, structure, focus, etc. The most successful prompts are the ones that generate a positively-rated output in one attempt.
@@ -222,11 +224,11 @@ Your analysis should cover:
 1. Patterns that consistently led to successful generations across all attempts
 2. Key changes and refinements that turned unsuccessful prompts into successful ones
 3. Strategic recommendations for future prompt crafting
-4. ${isVideo ? 
-    `Detailed analysis of each scene group, comparing different attempts and understanding what changes improved results` 
-    : 
-    `Analysis of prompt groups sharing similar objectives, comparing different approaches and identifying the most effective techniques`
-}
+4. ${
+    isVideo
+      ? `Detailed analysis of each scene group, comparing different attempts and understanding what changes improved results`
+      : `Analysis of prompt groups sharing similar objectives, comparing different approaches and identifying the most effective techniques`
+  }
 
 IMPORTANT: You must respond with valid JSON only. No other text or explanation.
 The JSON must match exactly the structure shown in the prompt.`;
@@ -234,7 +236,7 @@ The JSON must match exactly the structure shown in the prompt.`;
   const prompt = `Analyze this chronological history of ${category} generation prompts:
 
 PROMPT HISTORY:
-${promptHistory.map((p, i) => `${i + 1}. [${p.rating.toUpperCase()}] ${p.prompt}${isVideo && p.imageUrl ? ` [Image: ${p.imageUrl}]` : ''}`).join("\n")}
+${promptHistory.map((p, i) => `${i + 1}. [${p.rating.toUpperCase()}] ${p.prompt}${isVideo && p.imageUrl ? ` [Image: ${p.imageUrl}]` : ""}`).join("\n")}
 
 Provide a comprehensive analysis in the following JSON structure:
 {
@@ -252,10 +254,10 @@ Provide a comprehensive analysis in the following JSON structure:
   ],
   "sceneAnalysis": [
     {
-      ${isVideo ? 
-        `"imageUrl": "URL of the source image for this scene group",` 
-        : 
-        `"theme": "Description of what this group of prompts aims to achieve",`
+      ${
+        isVideo
+          ? `"imageUrl": "URL of the source image for this scene group",`
+          : `"theme": "Description of what this group of prompts aims to achieve",`
       }
       "attempts": [
         {
@@ -273,14 +275,14 @@ Provide a comprehensive analysis in the following JSON structure:
 }
 
 Analysis Guidelines:
-${isVideo ? 
-  `For video generation analysis, examine how different prompts affect the same base image. Look for:
+${
+  isVideo
+    ? `For video generation analysis, examine how different prompts affect the same base image. Look for:
 - How prompt variations change the interpretation of the same image
 - Which modifications to prompt structure or content led to better animations
 - Patterns in successful adaptations of the base image
-- Specific techniques that improved motion or maintained image fidelity` 
-  : 
-  `For ${category} generation analysis, examine how different approaches affect similar goals. Look for:
+- Specific techniques that improved motion or maintained image fidelity`
+    : `For ${category} generation analysis, examine how different approaches affect similar goals. Look for:
 - Common elements in prompts trying to achieve similar effects
 - How variations in technique or structure affected results
 - Patterns in prompt construction that consistently worked well
@@ -303,9 +305,9 @@ Remember: Your response must be a single, valid JSON object matching the structu
       const cleanedResponse = data.output
         .trim()
         // Remove any markdown code block markers
-        .replace(/```json\n?|\n?```/g, '')
+        .replace(/```json\n?|\n?```/g, "")
         // Remove any trailing commas before closing brackets/braces
-        .replace(/,(\s*[}\]])/g, '$1');
+        .replace(/,(\s*[}\]])/g, "$1");
 
       return JSON.parse(cleanedResponse);
     } catch (error) {

@@ -67,7 +67,7 @@ export function PromptAnalysis({ data, onAnalyze }: PromptAnalysisProps) {
   };
 
   const filteredData = data.filter(
-    (item) => selectedType === "all" || item.category === selectedType
+    (item) => selectedType === "all" || item.category === selectedType,
   );
 
   const formatTimestamp = (timestamp: number) => {
