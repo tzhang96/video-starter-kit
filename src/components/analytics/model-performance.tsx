@@ -1,4 +1,5 @@
-import { type ModelStats, getModelName } from "@/lib/analytics";
+import { getModelName, normalizeModelId } from "@/lib/analytics";
+import type { ModelStats } from "@/lib/analytics";
 import {
   BarChart,
   Bar,
@@ -40,12 +41,24 @@ export function ModelPerformance({ data }: ModelPerformanceProps) {
     const endpoint = AVAILABLE_ENDPOINTS.find((e) => e.endpointId === modelId);
     if (endpoint) return endpoint.category;
 
-    // Try matching base model ID (for variants like image-to-video)
-    const baseModelId = modelId.split("/").slice(0, -1).join("/");
+    // Try with normalized ID
+    const normalizedId = normalizeModelId(modelId);
     const baseEndpoint = AVAILABLE_ENDPOINTS.find(
-      (e) => e.endpointId === baseModelId,
+      (e) => normalizeModelId(e.endpointId) === normalizedId
     );
-    return baseEndpoint?.category || null;
+    if (baseEndpoint) return baseEndpoint.category;
+
+    // For Kling models, check if it's in the Kling family
+    if (normalizedId.includes("kling-video")) {
+      return "video";
+    }
+
+    // If still not found, try matching the model family
+    const modelFamily = modelId.split("/").slice(0, 3).join("/");
+    const familyEndpoint = AVAILABLE_ENDPOINTS.find(
+      (e) => e.endpointId.startsWith(modelFamily)
+    );
+    return familyEndpoint?.category || null;
   };
 
   const filteredData = data.filter((stat) => {
@@ -54,7 +67,26 @@ export function ModelPerformance({ data }: ModelPerformanceProps) {
     return modelType === selectedType;
   });
 
-  const chartData = filteredData.map((stat) => ({
+  // Consolidate stats for base models and their variants
+  const consolidatedData = filteredData.reduce((acc, stat) => {
+    const normalizedId = normalizeModelId(stat.modelId);
+    const existing = acc.find(s => normalizeModelId(s.modelId) === normalizedId);
+    
+    if (existing) {
+      existing.totalGenerations += stat.totalGenerations;
+      existing.positive += stat.positive;
+      existing.negative += stat.negative;
+      existing.unrated += stat.unrated;
+      existing.positiveRate = (existing.positive / existing.totalGenerations) * 100;
+      existing.negativeRate = (existing.negative / existing.totalGenerations) * 100;
+      existing.unratedRate = (existing.unrated / existing.totalGenerations) * 100;
+    } else {
+      acc.push({...stat});
+    }
+    return acc;
+  }, [] as ModelStats[]);
+
+  const chartData = consolidatedData.map((stat) => ({
     name: getModelName(stat.modelId),
     Positive: stat.positive,
     Negative: stat.negative,
@@ -144,7 +176,7 @@ export function ModelPerformance({ data }: ModelPerformanceProps) {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {filteredData.map((stat) => (
+        {consolidatedData.map((stat) => (
           <div key={stat.modelId} className="p-4 rounded-lg bg-accent">
             <h3 className="font-medium mb-1">{getModelName(stat.modelId)}</h3>
             <p className="text-sm text-muted-foreground">

@@ -54,17 +54,38 @@ export type PromptAnalysis = {
   };
 };
 
+export function normalizeModelId(modelId: string): string {
+  if (!modelId) return modelId;
+  
+  // Handle Kling model variants
+  if (modelId.includes("kling-video")) {
+    const parts = modelId.split("/");
+    // Find version and variant parts
+    const version = parts.find(p => p.startsWith("v"));
+    const variant = parts.find(p => p === "standard" || p === "pro");
+    
+    if (version && variant) {
+      return `fal-ai/kling-video/${version}/${variant}`;
+    }
+  }
+  
+  // Handle other model variants
+  return modelId
+    .replace("/image-to-video", "")
+    .replace("/text-to-video", "");
+}
+
 export function calculateModelStats(mediaItems: MediaItem[]): ModelStats[] {
-  // Group by model (endpointId)
+  // Group by model (endpointId), normalizing IDs to handle variants
   const byModel = new Map<string, MediaItem[]>();
 
   for (const item of mediaItems) {
-    if (item.kind !== "generated") continue;
-    const modelId = item.endpointId;
-    if (!byModel.has(modelId)) {
-      byModel.set(modelId, []);
+    if (item.kind !== "generated" || !item.endpointId) continue;
+    const normalizedId = normalizeModelId(item.endpointId);
+    if (!byModel.has(normalizedId)) {
+      byModel.set(normalizedId, []);
     }
-    byModel.get(modelId)!.push(item);
+    byModel.get(normalizedId)!.push(item);
   }
 
   // Calculate stats for each model
@@ -123,9 +144,10 @@ export function calculateCategoryStats(
 }
 
 export function getModelName(modelId: string): string {
-  // Extract readable name from model ID
-  // e.g., "fal-ai/minimax/video-01-live" -> "Minimax Video"
-  const parts = modelId.split("/");
+  // Normalize the model ID
+  const normalizedId = normalizeModelId(modelId);
+  
+  const parts = normalizedId.split("/");
   if (parts.length < 2) return modelId;
 
   // Remove fal-ai prefix if present
@@ -139,7 +161,7 @@ export function getModelName(modelId: string): string {
       part
         .split("-")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" "),
+        .join(" ")
     )
     .join(" ");
 }
