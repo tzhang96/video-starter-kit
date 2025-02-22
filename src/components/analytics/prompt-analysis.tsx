@@ -2,70 +2,46 @@ import {
   type PromptAnalysis as PromptAnalysisType,
   getModelName,
 } from "@/lib/analytics";
-import { Badge } from "@/components/ui/badge";
 import {
   LightbulbIcon,
   CheckCircleIcon,
   XCircleIcon,
   SparklesIcon,
+  FilmIcon,
+  ImageIcon,
+  MusicIcon,
+  MicIcon,
+  LayersIcon,
+  TrendingUpIcon,
+  ClockIcon,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-
-interface ModelPrompts {
-  modelId: string;
-  positivePrompts: string[];
-  negativePrompts: string[];
-}
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import type { MediaType } from "@/data/store";
 
 interface PromptAnalysisProps {
-  data: ModelPrompts[];
-  onAnalyze: (modelId: string) => Promise<PromptAnalysisType>;
-<<<<<<< Updated upstream
-}
-
-export function PromptAnalysis({ data, onAnalyze }: PromptAnalysisProps) {
-=======
-  onAnalyzeCategory?: (
-    category: MediaType,
-    modelIds: string[],
-  ) => Promise<PromptAnalysisType>;
+  data: Array<{
+    category: MediaType;
+    promptHistory: Array<{
+      prompt: string;
+      rating: "positive" | "negative";
+      timestamp: number;
+      modelId: string;
+    }>;
+  }>;
+  onAnalyze: (category: MediaType) => Promise<PromptAnalysisType>;
 }
 
 type FilterType = MediaType | "all";
 
-function getModelType(modelId: string): MediaType | null {
-  // First try exact match
-  const endpoint = AVAILABLE_ENDPOINTS.find((e) => e.endpointId === modelId);
-  if (endpoint) return endpoint.category;
-
-  // Try matching base model ID (for variants like image-to-video)
-  const baseModelId = modelId.split("/").slice(0, -1).join("/");
-  const baseEndpoint = AVAILABLE_ENDPOINTS.find(
-    (e) => e.endpointId === baseModelId,
-  );
-  return baseEndpoint?.category || null;
-}
-
-export function PromptAnalysis({
-  data,
-  onAnalyze,
-  onAnalyzeCategory,
-}: PromptAnalysisProps) {
+export function PromptAnalysis({ data, onAnalyze }: PromptAnalysisProps) {
   const [selectedType, setSelectedType] = useState<FilterType>("video");
->>>>>>> Stashed changes
   const [analysisResults, setAnalysisResults] = useState<
     Record<string, PromptAnalysisType>
   >({});
   const [analyzing, setAnalyzing] = useState<Record<string, boolean>>({});
-<<<<<<< Updated upstream
-=======
-  const [categoryAnalysis, setCategoryAnalysis] = useState<
-    Record<string, PromptAnalysisType>
-  >({});
-  const [analyzingCategory, setAnalyzingCategory] = useState(false);
->>>>>>> Stashed changes
 
   if (data.length === 0) {
     return (
@@ -76,48 +52,27 @@ export function PromptAnalysis({
     );
   }
 
-  const handleAnalyze = async (modelId: string) => {
-    setAnalyzing((prev) => ({ ...prev, [modelId]: true }));
+  const handleAnalyze = async (category: MediaType) => {
+    setAnalyzing((prev) => ({ ...prev, [category]: true }));
     try {
-      const result = await onAnalyze(modelId);
-      setAnalysisResults((prev) => ({ ...prev, [modelId]: result }));
+      const result = await onAnalyze(category);
+      setAnalysisResults((prev) => ({ ...prev, [category]: result }));
     } finally {
-      setAnalyzing((prev) => ({ ...prev, [modelId]: false }));
+      setAnalyzing((prev) => ({ ...prev, [category]: false }));
     }
   };
 
-<<<<<<< Updated upstream
-  return (
-    <div className="space-y-6">
-      {data.map((model) => (
-=======
-  const handleAnalyzeCategory = async () => {
-    if (!onAnalyzeCategory || analyzingCategory) return;
-
-    setAnalyzingCategory(true);
-    try {
-      const category = selectedType as MediaType;
-      const modelIds = data
-        .filter(
-          (model) =>
-            selectedType === "all" ||
-            getModelType(model.modelId) === selectedType,
-        )
-        .map((model) => model.modelId);
-
-      if (modelIds.length === 0) return;
-
-      const result = await onAnalyzeCategory(category, modelIds);
-      setCategoryAnalysis((prev) => ({ ...prev, [selectedType]: result }));
-    } finally {
-      setAnalyzingCategory(false);
-    }
+  const handleFilterChange = (value: string) => {
+    setSelectedType(value as FilterType);
   };
 
   const filteredData = data.filter(
-    (model) =>
-      selectedType === "all" || getModelType(model.modelId) === selectedType,
+    (item) => selectedType === "all" || item.category === selectedType
   );
+
+  const formatTimestamp = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString();
+  };
 
   return (
     <div className="space-y-6">
@@ -149,125 +104,50 @@ export function PromptAnalysis({
             All
           </ToggleGroupItem>
         </ToggleGroup>
-
-        {onAnalyzeCategory && filteredData.length > 0 && (
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              onClick={handleAnalyzeCategory}
-              disabled={analyzingCategory}
-            >
-              <TrendingUpIcon className="w-4 h-4 mr-2" />
-              {analyzingCategory
-                ? `Analyzing ${selectedType === "all" ? "All Models" : selectedType} Usage...`
-                : `Compare ${selectedType === "all" ? "All Models" : selectedType} Usage`}
-            </Button>
-          </div>
-        )}
       </div>
 
-      {/* Category Analysis Results */}
-      {categoryAnalysis[selectedType] && (
-        <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-6 space-y-4">
-          <h3 className="text-xl font-semibold leading-none tracking-tight flex items-center gap-2">
-            <TrendingUpIcon className="w-5 h-5" />
-            {selectedType === "all"
-              ? "Cross-Model Analysis"
-              : `${selectedType} Models Analysis`}
-          </h3>
-
-          <div className="space-y-4">
-            <div>
-              <h4 className="text-sm font-medium text-green-600 dark:text-green-500 mb-2 flex items-center gap-1">
-                <CheckCircleIcon className="w-4 h-4" />
-                Key Success Patterns
-              </h4>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                {categoryAnalysis[selectedType].analysis.positivePatterns.map(
-                  (pattern, i) => (
-                    <li key={i}>{pattern}</li>
-                  ),
-                )}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-red-600 dark:text-red-500 mb-2 flex items-center gap-1">
-                <XCircleIcon className="w-4 h-4" />
-                Common Challenges
-              </h4>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                {categoryAnalysis[selectedType].analysis.negativePatterns.map(
-                  (pattern, i) => (
-                    <li key={i}>{pattern}</li>
-                  ),
-                )}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
-                <LightbulbIcon className="w-4 h-4" />
-                Strategic Recommendations
-              </h4>
-              <ul className="list-disc list-inside text-sm space-y-1">
-                {categoryAnalysis[selectedType].analysis.recommendations.map(
-                  (rec, i) => (
-                    <li key={i}>{rec}</li>
-                  ),
-                )}
-              </ul>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Individual Model Analysis */}
-      {filteredData.map((model) => (
->>>>>>> Stashed changes
+      {filteredData.map((categoryData) => (
         <div
-          key={model.modelId}
+          key={categoryData.category}
           className="rounded-lg border bg-card text-card-foreground shadow-sm"
         >
           <div className="flex flex-col space-y-1.5 p-6">
-            <h3 className="text-2xl font-semibold leading-none tracking-tight">
-              {getModelName(model.modelId)}
+            <h3 className="text-2xl font-semibold leading-none tracking-tight capitalize">
+              {categoryData.category} Generation Analysis
             </h3>
             <p className="text-sm text-muted-foreground">
-              {model.positivePrompts.length + model.negativePrompts.length}{" "}
-              rated prompts available ({model.positivePrompts.length} positive,{" "}
-              {model.negativePrompts.length} negative)
+              {categoryData.promptHistory.length} prompts analyzed
             </p>
           </div>
           <div className="p-6 pt-0">
-            {analysisResults[model.modelId] ? (
-              <div className="grid gap-4">
+            {analysisResults[categoryData.category] ? (
+              <div className="grid gap-6">
                 {/* Analysis Section */}
                 <div className="space-y-4">
                   <div>
                     <h4 className="text-sm font-medium text-green-600 dark:text-green-500 mb-2 flex items-center gap-1">
                       <CheckCircleIcon className="w-4 h-4" />
-                      Successful Patterns
+                      Success Patterns
                     </h4>
                     <ul className="list-disc list-inside text-sm space-y-1">
                       {analysisResults[
-                        model.modelId
-                      ].analysis.positivePatterns.map((pattern, i) => (
+                        categoryData.category
+                      ].analysis.successPatterns.map((pattern, i) => (
                         <li key={i}>{pattern}</li>
                       ))}
                     </ul>
                   </div>
 
                   <div>
-                    <h4 className="text-sm font-medium text-red-600 dark:text-red-500 mb-2 flex items-center gap-1">
-                      <XCircleIcon className="w-4 h-4" />
-                      Unsuccessful Patterns
+                    <h4 className="text-sm font-medium text-blue-600 dark:text-blue-500 mb-2 flex items-center gap-1">
+                      <TrendingUpIcon className="w-4 h-4" />
+                      Evolution Insights
                     </h4>
                     <ul className="list-disc list-inside text-sm space-y-1">
                       {analysisResults[
-                        model.modelId
-                      ].analysis.negativePatterns.map((pattern, i) => (
-                        <li key={i}>{pattern}</li>
+                        categoryData.category
+                      ].analysis.evolutionInsights.map((insight, i) => (
+                        <li key={i}>{insight}</li>
                       ))}
                     </ul>
                   </div>
@@ -275,11 +155,11 @@ export function PromptAnalysis({
                   <div>
                     <h4 className="text-sm font-medium mb-2 flex items-center gap-1">
                       <LightbulbIcon className="w-4 h-4" />
-                      Recommendations
+                      Strategic Recommendations
                     </h4>
                     <ul className="list-disc list-inside text-sm space-y-1">
                       {analysisResults[
-                        model.modelId
+                        categoryData.category
                       ].analysis.recommendations.map((rec, i) => (
                         <li key={i}>{rec}</li>
                       ))}
@@ -287,45 +167,53 @@ export function PromptAnalysis({
                   </div>
                 </div>
 
-                {/* Example Prompts */}
-                <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-green-600 dark:text-green-500">
-                      Example Successful Prompts
-                    </h4>
-                    <ScrollArea className="h-32 rounded border p-2">
-                      {model.positivePrompts.slice(0, 5).map((prompt, i) => (
-                        <p key={i} className="text-sm mb-2">
-                          {prompt}
-                        </p>
+                {/* Prompt Timeline */}
+                <div className="space-y-2 border-t pt-4">
+                  <h4 className="text-sm font-medium mb-4 flex items-center gap-1">
+                    <ClockIcon className="w-4 h-4" />
+                    Prompt Evolution Timeline
+                  </h4>
+                  <ScrollArea className="h-64">
+                    <div className="space-y-3">
+                      {categoryData.promptHistory.map((item, index) => (
+                        <div
+                          key={index}
+                          className={`p-3 rounded-lg text-sm ${
+                            item.rating === "positive"
+                              ? "bg-green-500/10 border border-green-500/20"
+                              : "bg-red-500/10 border border-red-500/20"
+                          }`}
+                        >
+                          <div className="flex justify-between items-start gap-2">
+                            <div className="flex-1">
+                              <p className="font-mono whitespace-pre-wrap">
+                                {item.prompt}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Model: {getModelName(item.modelId)}
+                              </p>
+                            </div>
+                            <time className="text-xs text-muted-foreground whitespace-nowrap">
+                              {formatTimestamp(item.timestamp)}
+                            </time>
+                          </div>
+                        </div>
                       ))}
-                    </ScrollArea>
-                  </div>
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-red-600 dark:text-red-500">
-                      Example Unsuccessful Prompts
-                    </h4>
-                    <ScrollArea className="h-32 rounded border p-2">
-                      {model.negativePrompts.slice(0, 5).map((prompt, i) => (
-                        <p key={i} className="text-sm mb-2">
-                          {prompt}
-                        </p>
-                      ))}
-                    </ScrollArea>
-                  </div>
+                    </div>
+                  </ScrollArea>
                 </div>
               </div>
             ) : (
-              <div className="flex justify-center py-4">
+              <div className="flex justify-end">
                 <Button
                   variant="outline"
-                  onClick={() => handleAnalyze(model.modelId)}
-                  disabled={analyzing[model.modelId]}
+                  onClick={() => handleAnalyze(categoryData.category)}
+                  disabled={analyzing[categoryData.category]}
                 >
                   <SparklesIcon className="w-4 h-4 mr-2" />
-                  {analyzing[model.modelId]
+                  {analyzing[categoryData.category]
                     ? "Analyzing Prompts..."
-                    : "Get Prompting Insights"}
+                    : "Analyze Prompt Evolution"}
                 </Button>
               </div>
             )}

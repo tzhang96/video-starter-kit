@@ -15,42 +15,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useCallback } from "react";
 import type { MediaItem } from "@/data/schema";
 import type { PromptAnalysis as PromptAnalysisType } from "@/lib/analytics";
+import type { MediaType } from "@/data/store";
 
 interface AnalyticsDialogProps {
   onOpenChange?: (open: boolean) => void;
 }
 
 function preparePromptData(mediaItems: MediaItem[]) {
-  // Group rated prompts by model
-  const byModel = new Map<
-    string,
-    { positivePrompts: string[]; negativePrompts: string[] }
-  >();
+  // Group rated prompts by category
+  const byCategory = new Map<MediaType, Array<{
+    prompt: string;
+    rating: "positive" | "negative";
+    timestamp: number;
+    modelId: string;
+  }>>();
 
   for (const item of mediaItems) {
-    if (item.kind !== "generated" || !item.input?.prompt || !item.rating)
-      continue;
-    const modelId = item.endpointId;
-    if (!byModel.has(modelId)) {
-      byModel.set(modelId, { positivePrompts: [], negativePrompts: [] });
+    if (
+      item.kind !== "generated" ||
+      !item.input?.prompt ||
+      !item.rating ||
+      !item.endpointId
+    ) continue;
+
+    const category = item.mediaType;
+    if (!byCategory.has(category)) {
+      byCategory.set(category, []);
     }
-    const modelData = byModel.get(modelId)!;
-    if (item.rating === "positive") {
-      modelData.positivePrompts.push(item.input.prompt);
-    } else {
-      modelData.negativePrompts.push(item.input.prompt);
-    }
+    byCategory.get(category)!.push({
+      prompt: item.input.prompt,
+      rating: item.rating,
+      timestamp: item.createdAt,
+      modelId: item.endpointId,
+    });
   }
 
-  // Convert to array format
-  return Array.from(byModel.entries())
-    .filter(
-      ([_, data]) =>
-        data.positivePrompts.length > 0 || data.negativePrompts.length > 0,
-    )
-    .map(([modelId, data]) => ({
-      modelId,
-      ...data,
+  // Convert to array format and sort by timestamp
+  return Array.from(byCategory.entries())
+    .map(([category, promptHistory]) => ({
+      category,
+      promptHistory: promptHistory.sort((a, b) => a.timestamp - b.timestamp),
     }));
 }
 
@@ -68,50 +72,20 @@ export function AnalyticsDialog({ onOpenChange }: AnalyticsDialogProps) {
   const promptData = preparePromptData(mediaItems);
 
   const handleAnalyzePrompts = useCallback(
-    async (modelId: string): Promise<PromptAnalysisType> => {
-      const modelItems = mediaItems.filter(
+    async (category: MediaType): Promise<PromptAnalysisType> => {
+      const categoryItems = mediaItems.filter(
         (item) =>
           item.kind === "generated" &&
-          item.endpointId === modelId &&
+          item.mediaType === category &&
           item.input?.prompt &&
           item.rating,
       );
-      const [analysis] = await analyzePrompts(modelItems);
+      const [analysis] = await analyzePrompts(categoryItems);
       return analysis;
     },
     [mediaItems],
   );
 
-<<<<<<< Updated upstream
-=======
-  const handleAnalyzeCategory = useCallback(
-    async (
-      category: MediaType,
-      modelIds: string[],
-    ): Promise<PromptAnalysisType> => {
-      // Get all rated prompts for the selected models
-      const modelItems = mediaItems.filter(
-        (item) =>
-          item.kind === "generated" &&
-          modelIds.includes(item.endpointId) &&
-          item.input?.prompt &&
-          item.rating,
-      );
-
-      // Create a special system prompt for category analysis
-      const systemPrompt = `You are an AI prompt analysis assistant specializing in ${category} generation. 
-Analyze patterns across multiple models to identify what works best for ${category} generation.
-Compare and contrast different approaches, and provide strategic recommendations for using these models effectively.
-Always respond in valid JSON format.`;
-
-      // Call analyzePrompts with the category-specific system prompt
-      const [analysis] = await analyzePrompts(modelItems, systemPrompt);
-      return analysis;
-    },
-    [mediaItems],
-  );
-
->>>>>>> Stashed changes
   const handleOnOpenChange = (isOpen: boolean) => {
     onOpenChange?.(isOpen);
     setAnalyticsDialogOpen(isOpen);
@@ -149,7 +123,7 @@ Always respond in valid JSON format.`;
 
           <TabsContent value="prompts" className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Analyze patterns in successful and unsuccessful prompts
+              Analyze the evolution of prompts and identify successful patterns
             </p>
 
             <PromptAnalysis

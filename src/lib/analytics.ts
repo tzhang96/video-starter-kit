@@ -25,14 +25,32 @@ export type CategoryStats = {
   unratedRate: number;
 };
 
-export type PromptAnalysis = {
+export type PromptHistory = {
+  prompt: string;
+  rating: "positive" | "negative";
+  timestamp: number;
   modelId: string;
-  positivePrompts: string[];
-  negativePrompts: string[];
+  imageUrl?: string;
+};
+
+export type SceneAnalysis = {
+  imageUrl?: string;
+  attempts: Array<{
+    prompt: string;
+    rating: "positive" | "negative";
+    comparison: string;
+  }>;
+  insights: string[];
+};
+
+export type PromptAnalysis = {
+  category: MediaType;
+  promptHistory: PromptHistory[];
   analysis: {
-    positivePatterns: string[];
-    negativePatterns: string[];
+    successPatterns: string[];
+    evolutionInsights: string[];
     recommendations: string[];
+    sceneAnalysis: SceneAnalysis[];
   };
 };
 
@@ -128,120 +146,185 @@ export function getModelName(modelId: string): string {
 
 export async function analyzePrompts(
   mediaItems: MediaItem[],
+  options?: { customSystemPrompt?: string },
 ): Promise<PromptAnalysis[]> {
-  // Group by model
-  const byModel = new Map<string, MediaItem[]>();
+  // Group by category
+  const byCategory = new Map<MediaType, MediaItem[]>();
 
   for (const item of mediaItems) {
-    if (item.kind !== "generated" || !item.input?.prompt || !item.rating)
-      continue;
-    const modelId = item.endpointId;
-    if (!byModel.has(modelId)) {
-      byModel.set(modelId, []);
+    if (item.kind !== "generated" || !item.input?.prompt || !item.rating) continue;
+    const category = item.mediaType;
+    if (!byCategory.has(category)) {
+      byCategory.set(category, []);
     }
-    byModel.get(modelId)!.push(item);
+    byCategory.get(category)!.push(item);
   }
 
-  // Analyze prompts for each model
+  // Analyze prompts for each category
   const analyses = await Promise.all(
-    Array.from(byModel.entries()).map(async ([modelId, items]) => {
-      const positivePrompts = items
-        .filter((i) => i.rating === "positive")
-        .map((i) => i.input?.prompt as string);
+    Array.from(byCategory.entries()).map(async ([category, items]) => {
+      // Sort items by timestamp
+      const sortedItems = items.sort((a, b) => a.createdAt - b.createdAt);
 
-      const negativePrompts = items
-        .filter((i) => i.rating === "negative")
-        .map((i) => i.input?.prompt as string);
+      // Create prompt history
+      const promptHistory = sortedItems
+        .filter((item): item is MediaItem & { endpointId: string } => 
+          item.kind === "generated" && typeof item.endpointId === "string"
+        )
+        .map(item => ({
+          prompt: item.input?.prompt as string,
+          rating: item.rating as "positive" | "negative",
+          timestamp: item.createdAt,
+          modelId: item.endpointId,
+          imageUrl: item.input?.image_url as string | undefined
+        }));
 
       // Skip if no rated prompts
-      if (positivePrompts.length === 0 && negativePrompts.length === 0) {
+      if (promptHistory.length === 0) {
         return null;
       }
 
       const analysis = await analyzeWithGemini(
-        positivePrompts,
-        negativePrompts,
-        modelId,
+        category,
+        promptHistory,
+        options?.customSystemPrompt,
       );
 
       return {
-        modelId,
-        positivePrompts,
-        negativePrompts,
+        category,
+        promptHistory,
         analysis,
-      };
+      } as PromptAnalysis;
     }),
   );
 
-  return analyses.filter((a): a is PromptAnalysis => a !== null);
+  return analyses.filter((a): a is NonNullable<typeof a> => a !== null);
 }
 
 async function analyzeWithGemini(
-  positivePrompts: string[],
-  negativePrompts: string[],
-  modelId: string,
-): Promise<{
-  positivePatterns: string[];
-  negativePatterns: string[];
-  recommendations: string[];
-}> {
-  const prompt = `Analyze these AI generation prompts for ${getModelName(modelId)}:
+  category: MediaType,
+  promptHistory: PromptHistory[],
+  customSystemPrompt?: string,
+): Promise<PromptAnalysis["analysis"]> {
+  const isVideo = category === "video";
+  
+  const defaultSystemPrompt = `You are an AI prompt analysis assistant specializing in ${category} generation.
+Your task is to analyze the evolution of prompts over time and identify what changes led to successful outcomes. 
+${isVideo ? 
+  `For video content, you will analyze related attempts at generating the same scene, primarily identified by shared image URLs. Pay special attention to how different prompt variations affect the same base image and identify which changes led to better results.` 
+  : 
+  `For ${category} content, you will analyze groups of prompts that share similar goals or techniques. Examine prompt length, structure, focus, etc. The most successful prompts are the ones that generate a positively-rated output in one attempt. Focus on understanding which variations in approach were most effective and what patterns emerge across successful attempts.`
+}
 
-SUCCESSFUL PROMPTS:
-${positivePrompts.map((p) => `- ${p}`).join("\n")}
+Examine prompt length, structure, focus, etc. The most successful prompts are the ones that generate a positively-rated output in one attempt.
 
-UNSUCCESSFUL PROMPTS:
-${negativePrompts.map((p) => `- ${p}`).join("\n")}
+Your analysis should cover:
+1. Patterns that consistently led to successful generations across all attempts
+2. Key changes and refinements that turned unsuccessful prompts into successful ones
+3. Strategic recommendations for future prompt crafting
+4. ${isVideo ? 
+    `Detailed analysis of each scene group, comparing different attempts and understanding what changes improved results` 
+    : 
+    `Analysis of prompt groups sharing similar objectives, comparing different approaches and identifying the most effective techniques`
+}
 
-Please provide three sections:
-1. Common patterns in successful prompts (bullet points)
-2. Common patterns in unsuccessful prompts (bullet points)
-3. Recommendations for better prompts (bullet points)
+IMPORTANT: You must respond with valid JSON only. No other text or explanation.
+The JSON must match exactly the structure shown in the prompt.`;
 
-Keep each bullet point concise and focused on actionable insights.
-If there are no patterns to identify in either successful or unsuccessful prompts, provide general best practices instead.
+  const prompt = `Analyze this chronological history of ${category} generation prompts:
 
-Return the response in JSON format with three arrays: positivePatterns, negativePatterns, and recommendations.
-Example format:
+PROMPT HISTORY:
+${promptHistory.map((p, i) => `${i + 1}. [${p.rating.toUpperCase()}] ${p.prompt}${isVideo && p.imageUrl ? ` [Image: ${p.imageUrl}]` : ''}`).join("\n")}
+
+Provide a comprehensive analysis in the following JSON structure:
 {
-  "positivePatterns": ["Pattern 1", "Pattern 2"],
-  "negativePatterns": ["Pattern 1", "Pattern 2"],
-  "recommendations": ["Recommendation 1", "Recommendation 2"]
-}`;
+  "successPatterns": [
+    "Detailed description of pattern that led to success",
+    "Another pattern with specific examples from the prompts"
+  ],
+  "evolutionInsights": [
+    "Insight about how prompts evolved and improved over time",
+    "Another insight about successful refinements"
+  ],
+  "recommendations": [
+    "Specific, actionable recommendation based on the analysis",
+    "Another strategic recommendation with clear reasoning"
+  ],
+  "sceneAnalysis": [
+    {
+      ${isVideo ? 
+        `"imageUrl": "URL of the source image for this scene group",` 
+        : 
+        `"theme": "Description of what this group of prompts aims to achieve",`
+      }
+      "attempts": [
+        {
+          "prompt": "exact prompt text",
+          "rating": "positive or negative",
+          "comparison": "Detailed analysis of how this attempt differed from others and why it worked or didn't work"
+        }
+      ],
+      "insights": [
+        "Specific insight about what worked or didn't work for this group",
+        "Technical observation about prompt structure or approach"
+      ]
+    }
+  ]
+}
+
+Analysis Guidelines:
+${isVideo ? 
+  `For video generation analysis, examine how different prompts affect the same base image. Look for:
+- How prompt variations change the interpretation of the same image
+- Which modifications to prompt structure or content led to better animations
+- Patterns in successful adaptations of the base image
+- Specific techniques that improved motion or maintained image fidelity` 
+  : 
+  `For ${category} generation analysis, examine how different approaches affect similar goals. Look for:
+- Common elements in prompts trying to achieve similar effects
+- How variations in technique or structure affected results
+- Patterns in prompt construction that consistently worked well
+- Specific approaches that led to higher quality outputs`
+}
+
+Remember: Your response must be a single, valid JSON object matching the structure above. No other text or explanation.`;
 
   try {
-    const { data } = await fal.subscribe("fal-ai/gemini-2.0-flash", {
+    const { data } = await fal.subscribe("fal-ai/any-llm", {
       input: {
-<<<<<<< Updated upstream
-        system_prompt:
-          "You are an AI prompt analysis assistant. Analyze patterns in successful and unsuccessful prompts to provide actionable insights. Always respond in valid JSON format.",
-=======
->>>>>>> Stashed changes
         prompt,
-        system_prompt: customSystemPrompt || "You are an AI prompt analysis assistant. Analyze patterns in successful and unsuccessful prompts to provide actionable insights. Always respond in valid JSON format.",
-        temperature: 0.7,
-        max_tokens: 1000,
+        system_prompt: customSystemPrompt || defaultSystemPrompt,
+        model: "google/gemini-flash-1.5",
       },
     });
 
     try {
-      return extractJson(data.response);
+      // Clean the response to ensure it's valid JSON
+      const cleanedResponse = data.output
+        .trim()
+        // Remove any markdown code block markers
+        .replace(/```json\n?|\n?```/g, '')
+        // Remove any trailing commas before closing brackets/braces
+        .replace(/,(\s*[}\]])/g, '$1');
+
+      return JSON.parse(cleanedResponse);
     } catch (error) {
       console.error("Failed to parse LLM response as JSON:", error);
+      console.error("Raw response:", data.output);
       return {
-        positivePatterns: ["Could not analyze patterns in successful prompts"],
-        negativePatterns: [
-          "Could not analyze patterns in unsuccessful prompts",
-        ],
-        recommendations: ["Try rating more prompts to get better analysis"],
+        successPatterns: ["Could not analyze patterns in prompts"],
+        evolutionInsights: ["Could not analyze prompt evolution"],
+        recommendations: ["Try more prompt variations to get better analysis"],
+        sceneAnalysis: [],
       };
     }
   } catch (error) {
     console.error("Error analyzing prompts with LLM:", error);
     return {
-      positivePatterns: [],
-      negativePatterns: [],
+      successPatterns: [],
+      evolutionInsights: [],
       recommendations: ["An error occurred while analyzing prompts"],
+      sceneAnalysis: [],
     };
   }
 }
