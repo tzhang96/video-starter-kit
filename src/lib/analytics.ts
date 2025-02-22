@@ -56,23 +56,21 @@ export type PromptAnalysis = {
 
 export function normalizeModelId(modelId: string): string {
   if (!modelId) return modelId;
-  
+
   // Handle Kling model variants
   if (modelId.includes("kling-video")) {
     const parts = modelId.split("/");
     // Find version and variant parts
-    const version = parts.find(p => p.startsWith("v"));
-    const variant = parts.find(p => p === "standard" || p === "pro");
-    
+    const version = parts.find((p) => p.startsWith("v"));
+    const variant = parts.find((p) => p === "standard" || p === "pro");
+
     if (version && variant) {
       return `fal-ai/kling-video/${version}/${variant}`;
     }
   }
-  
+
   // Handle other model variants
-  return modelId
-    .replace("/image-to-video", "")
-    .replace("/text-to-video", "");
+  return modelId.replace("/image-to-video", "").replace("/text-to-video", "");
 }
 
 export function calculateModelStats(mediaItems: MediaItem[]): ModelStats[] {
@@ -146,7 +144,7 @@ export function calculateCategoryStats(
 export function getModelName(modelId: string): string {
   // Normalize the model ID
   const normalizedId = normalizeModelId(modelId);
-  
+
   const parts = normalizedId.split("/");
   if (parts.length < 2) return modelId;
 
@@ -161,7 +159,7 @@ export function getModelName(modelId: string): string {
       part
         .split("-")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ")
+        .join(" "),
     )
     .join(" ");
 }

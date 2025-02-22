@@ -44,19 +44,19 @@ export function ModelPerformance({ data }: ModelPerformanceProps) {
     // Try with normalized ID
     const normalizedId = normalizeModelId(modelId);
     const baseEndpoint = AVAILABLE_ENDPOINTS.find(
-      (e) => normalizeModelId(e.endpointId) === normalizedId
+      (e) => normalizeModelId(e.endpointId) === normalizedId,
     );
     if (baseEndpoint) return baseEndpoint.category;
 
     // For Kling models, check if it's in the Kling family
-    if (normalizedId.includes("kling-video")) {
+    if (normalizedId.includes("kling-video") || normalizedId.includes("i2v")) {
       return "video";
     }
 
     // If still not found, try matching the model family
     const modelFamily = modelId.split("/").slice(0, 3).join("/");
-    const familyEndpoint = AVAILABLE_ENDPOINTS.find(
-      (e) => e.endpointId.startsWith(modelFamily)
+    const familyEndpoint = AVAILABLE_ENDPOINTS.find((e) =>
+      e.endpointId.startsWith(modelFamily),
     );
     return familyEndpoint?.category || null;
   };
@@ -70,18 +70,23 @@ export function ModelPerformance({ data }: ModelPerformanceProps) {
   // Consolidate stats for base models and their variants
   const consolidatedData = filteredData.reduce((acc, stat) => {
     const normalizedId = normalizeModelId(stat.modelId);
-    const existing = acc.find(s => normalizeModelId(s.modelId) === normalizedId);
-    
+    const existing = acc.find(
+      (s) => normalizeModelId(s.modelId) === normalizedId,
+    );
+
     if (existing) {
       existing.totalGenerations += stat.totalGenerations;
       existing.positive += stat.positive;
       existing.negative += stat.negative;
       existing.unrated += stat.unrated;
-      existing.positiveRate = (existing.positive / existing.totalGenerations) * 100;
-      existing.negativeRate = (existing.negative / existing.totalGenerations) * 100;
-      existing.unratedRate = (existing.unrated / existing.totalGenerations) * 100;
+      existing.positiveRate =
+        (existing.positive / existing.totalGenerations) * 100;
+      existing.negativeRate =
+        (existing.negative / existing.totalGenerations) * 100;
+      existing.unratedRate =
+        (existing.unrated / existing.totalGenerations) * 100;
     } else {
-      acc.push({...stat});
+      acc.push({ ...stat });
     }
     return acc;
   }, [] as ModelStats[]);
